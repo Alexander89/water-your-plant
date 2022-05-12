@@ -1,0 +1,14 @@
+diff --git a/.pio/libdeps/esp32dev/esp32_https_server/src/HTTPConnection.hpp b/.pio/libdeps/esp32dev/esp32_https_server/src/HTTPConnection.hpp
+index fb15d7a..adf8819 100644
+--- a/.pio/libdeps/esp32dev/esp32_https_server/src/HTTPConnection.hpp
++++ b/.pio/libdeps/esp32dev/esp32_https_server/src/HTTPConnection.hpp
+@@ -6,7 +6,7 @@
+ 
+ #include <string>
+ #include <mbedtls/base64.h>
+-#include <hwcrypto/sha.h>
++#include <sha/sha_parallel_engine.h>
+ #include <functional>
+ 
+ // Required for sockets
+ 

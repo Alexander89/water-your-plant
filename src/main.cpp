@@ -7,14 +7,22 @@
 #include "HTTPServer.hpp"
 
 #define CSS "<style>" HTML BODY H1 BODY H1 UPTIME LI BUTTON LEVEL "</style>"
-const char *HTML_HEADER = "<!DOCTYPE html><html>" CSS "<head><title>Water Sensor</title></head><body>";
+#define META "<meta name=\"viewport\" content=\"width=device-width\">"
+const char *HTML_HEADER = "<!DOCTYPE html><html>" CSS META "<head><title>Water Sensor</title></head><body>";
 const char *HTML_FOOTER = "</body></html>";
+
+RTC_DATA_ATTR int bootCount = 0;
+constexpr long TIME_TO_SLEEP = 10 * 60 * 1000 * 1000;  // time between the pools to be offline
+constexpr long TIMEOUT_TO_SLEEP = 1 * 60 * 1000 * 1000;  // time between the pools to be offline
+
+time_t goToSleepNow = LONG_MAX;
 
 // Set web server port number to 80
 httpsserver::HTTPServer httpServer;
 
 void handleRoot(httpsserver::HTTPRequest *req, httpsserver::HTTPResponse *res);
 void handleMetrics(httpsserver::HTTPRequest *req, httpsserver::HTTPResponse *res);
+void print_wakeup_reason();
 
 void setup() {
   pinMode(34, INPUT);
@@ -26,6 +34,14 @@ void setup() {
     delay(500);
     Serial.print(".");
   }
+
+  //Increment boot number and print it every reboot
+  ++bootCount;
+  Serial.println("Boot number: " + String(bootCount));
+
+  //Print the wakeup reason for ESP32
+  print_wakeup_reason();
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP);
 
     // Print local IP address and start web server
   Serial.println("");
@@ -48,6 +64,24 @@ void setup() {
 
 void loop() {
   httpServer.loop();
+
+  if (goToSleepNow < millis() || millis() > TIMEOUT_TO_SLEEP) {
+    esp_deep_sleep_start();
+  }
+}
+
+void print_wakeup_reason(){
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+
+  switch(wakeup_reason)
+  {
+    case ESP_SLEEP_WAKEUP_EXT0 : Serial.println("Wakeup caused by external signal using RTC_IO"); break;
+    case ESP_SLEEP_WAKEUP_EXT1 : Serial.println("Wakeup caused by external signal using RTC_CNTL"); break;
+    case ESP_SLEEP_WAKEUP_TIMER : Serial.println("Wakeup caused by timer"); break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD : Serial.println("Wakeup caused by touchpad"); break;
+    case ESP_SLEEP_WAKEUP_ULP : Serial.println("Wakeup caused by ULP program"); break;
+    default : Serial.printf("Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
+  }
 }
 
 #define r(x) res->print(x)
@@ -107,4 +141,7 @@ void handleMetrics(httpsserver::HTTPRequest *req, httpsserver::HTTPResponse *res
   // adding the uptime value to the metrics
   res->print(millis(), DEC);
   r("\n");
+
+  res->finalize();
+  goToSleepNow = millis() + 300;
 }
