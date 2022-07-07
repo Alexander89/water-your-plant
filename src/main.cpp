@@ -12,8 +12,8 @@ const char *HTML_HEADER = "<!DOCTYPE html><html>" CSS META "<head><title>Water S
 const char *HTML_FOOTER = "</body></html>";
 
 RTC_DATA_ATTR int bootCount = 0;
-constexpr long TIME_TO_SLEEP = 10 * 60 * 1000 * 1000;  // time between the pools to be offline
-constexpr long TIMEOUT_TO_SLEEP = 1 * 60 * 1000 * 1000;  // time between the pools to be offline
+constexpr long TIME_TO_SLEEP = 2 * 60 * 1000 * 1000; // time between the pools to be offline
+constexpr long TIMEOUT_TO_SLEEP = 1 * 60 * 1000;     // time between the pools to be offline
 
 time_t goToSleepNow = LONG_MAX;
 
@@ -24,26 +24,37 @@ void handleRoot(httpsserver::HTTPRequest *req, httpsserver::HTTPResponse *res);
 void handleMetrics(httpsserver::HTTPRequest *req, httpsserver::HTTPResponse *res);
 void print_wakeup_reason();
 
-void setup() {
+void setup()
+{
   pinMode(34, INPUT);
+  pinMode(32, OUTPUT);
+  pinMode(35, OUTPUT);
+  digitalWrite(35, HIGH);
+  digitalWrite(32, LOW);
+
   Serial.begin(115200);
 
   Serial.println(ssid);
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(500);
     Serial.print(".");
+    if (millis() > 30000)
+    {
+      ESP.restart();
+    }
   }
 
-  //Increment boot number and print it every reboot
+  // Increment boot number and print it every reboot
   ++bootCount;
   Serial.println("Boot number: " + String(bootCount));
 
-  //Print the wakeup reason for ESP32
+  // Print the wakeup reason for ESP32
   print_wakeup_reason();
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP);
 
-    // Print local IP address and start web server
+  // Print local IP address and start web server
   Serial.println("");
   Serial.println("WiFi connected.");
   Serial.println("IP address: ");
@@ -62,30 +73,48 @@ void setup() {
     Serial.println("Server failed to start.");
 }
 
-void loop() {
+void loop()
+{
   httpServer.loop();
 
-  if (goToSleepNow < millis() || millis() > TIMEOUT_TO_SLEEP) {
+  if (goToSleepNow < millis() || millis() > TIMEOUT_TO_SLEEP)
+  {
+    Serial.println("sleep now");
     esp_deep_sleep_start();
   }
 }
 
-void print_wakeup_reason(){
+void print_wakeup_reason()
+{
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
 
-  switch(wakeup_reason)
+  switch (wakeup_reason)
   {
-    case ESP_SLEEP_WAKEUP_EXT0 : Serial.println("Wakeup caused by external signal using RTC_IO"); break;
-    case ESP_SLEEP_WAKEUP_EXT1 : Serial.println("Wakeup caused by external signal using RTC_CNTL"); break;
-    case ESP_SLEEP_WAKEUP_TIMER : Serial.println("Wakeup caused by timer"); break;
-    case ESP_SLEEP_WAKEUP_TOUCHPAD : Serial.println("Wakeup caused by touchpad"); break;
-    case ESP_SLEEP_WAKEUP_ULP : Serial.println("Wakeup caused by ULP program"); break;
-    default : Serial.printf("Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
+  case ESP_SLEEP_WAKEUP_EXT0:
+    Serial.println("Wakeup caused by external signal using RTC_IO");
+    break;
+  case ESP_SLEEP_WAKEUP_EXT1:
+    Serial.println("Wakeup caused by external signal using RTC_CNTL");
+    break;
+  case ESP_SLEEP_WAKEUP_TIMER:
+    Serial.println("Wakeup caused by timer");
+    break;
+  case ESP_SLEEP_WAKEUP_TOUCHPAD:
+    Serial.println("Wakeup caused by touchpad");
+    break;
+  case ESP_SLEEP_WAKEUP_ULP:
+    Serial.println("Wakeup caused by ULP program");
+    break;
+  default:
+    Serial.printf("Wakeup was not caused by deep sleep: %d\n", wakeup_reason);
+    break;
   }
 }
 
 #define r(x) res->print(x)
-#define rl(x) r(x);r("\n")
+#define rl(x) \
+  r(x);       \
+  r("\n")
 
 void handleRoot(httpsserver::HTTPRequest *req, httpsserver::HTTPResponse *res)
 {
@@ -104,11 +133,16 @@ void handleRoot(httpsserver::HTTPRequest *req, httpsserver::HTTPResponse *res)
   rl("</ul>");
 
   r("<div><p>Water level:</p>");
-  if (value < 10) {
+  if (value < 10)
+  {
     r("<p class=\"lvl low\">");
-  } else if (value < 30) {
+  }
+  else if (value < 30)
+  {
     r("<p class=\"lvl medium\">");
-  } else {
+  }
+  else
+  {
     r("<p class=\"lvl ok\">");
   }
   res->print(value, DEC);
